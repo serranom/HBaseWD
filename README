@@ -116,13 +116,23 @@ https://groups.google.com/group/hbasewd/
 
 Build Notes:
 ------------
-Current pom configured to build against HBase 0.89.20100924.
-HBase jars are provided with sources, as only HBase trunk sources
-were mavenized and available in public repos.
 Tests take some time to execute (can be up to several minutes), to skip
 their execution use -Dmaven.skip.tests=true.
 
-HBase Version Compatibility:
-----------------------------
-Compatible with HBase 0.20.5 and higher.
-May be compatible with previous: tests needed (TODO)
+The latest stable version can be linked from you maven project with:
+
+  <repositories>
+    <repository>
+      <id>sonatype release</id>
+      <url>https://oss.sonatype.org/content/repositories/releases/</url>
+    </repository>
+  </repositories>
+
+[...]
+
+  <dependency>
+    <groupId>com.sematext.hbasewd</groupId>
+    <artifactId>hbasewd</artifactId>
+    <version>0.1.0</version>
+  </dependency>
+
