@@ -2,13 +2,7 @@ HBaseWD:
 ---------
 http://github.com/sematext/HBaseWD
 
-April 2011
-
 Released under Apache License 2.0.
-
-Author:
--------
-Alex Baranau
 
 Description:
 ------------
@@ -136,3 +130,6 @@ The latest stable version can be linked from you maven project with:
     <version>0.1.0</version>
   </dependency>
 
+Author:
+-------
+Alex Baranau
