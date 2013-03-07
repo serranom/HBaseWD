@@ -49,9 +49,10 @@ public abstract class AbstractRowKeyDistributor implements Parametrizable {
     byte[][] stopKeys;
     if (Arrays.equals(originalStopKey, HConstants.EMPTY_END_ROW)) {
       Arrays.sort(startKeys, Bytes.BYTES_RAWCOMPARATOR);
-      stopKeys = new byte[startKeys.length][];
+      // stop keys are the start key of the next interval
+      stopKeys = getAllDistributedKeys(HConstants.EMPTY_BYTE_ARRAY);
       for (int i = 0; i < stopKeys.length - 1; i++) {
-        stopKeys[i] = startKeys[i + 1];
+        stopKeys[i] = stopKeys[i + 1];
       }
       stopKeys[stopKeys.length - 1] = HConstants.EMPTY_END_ROW;
     } else {

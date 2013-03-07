@@ -106,6 +106,15 @@ public abstract class RowKeyDistributorTestBase {
     testSimpleScanInternal(origKeyPrefix, new Scan(), 500, 500, 0, 999);
   }
 
+  /** Test scan without stop key. */
+  @Test
+  public void testSimpleScanWithoutStopKey() throws IOException {
+    long origKeyPrefix = System.currentTimeMillis();
+    int seekIntervalMinValue = 100;
+    byte[] startKey = Bytes.toBytes(origKeyPrefix + seekIntervalMinValue);
+    testSimpleScanInternal(origKeyPrefix, new Scan(startKey), 500, 500, 100, 999);
+  }
+
   /** Test scan with start and stop key. */
   @Test
   public void testMapReduceBounded() throws IOException, InterruptedException, ClassNotFoundException {
