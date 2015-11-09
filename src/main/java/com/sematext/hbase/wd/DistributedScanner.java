@@ -21,10 +21,10 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**
@@ -37,15 +37,17 @@ public class DistributedScanner implements ResultScanner {
   private final ResultScanner[] scanners;
   private final List<Result>[] nextOfScanners;
   private Result next = null;
+  private final boolean reversed;
 
   @SuppressWarnings("unchecked")
-  public DistributedScanner(AbstractRowKeyDistributor keyDistributor, ResultScanner[] scanners) throws IOException {
+  public DistributedScanner(AbstractRowKeyDistributor keyDistributor, ResultScanner[] scanners, boolean reversed) throws IOException {
     this.keyDistributor = keyDistributor;
     this.scanners = scanners;
     this.nextOfScanners = new List[scanners.length];
     for (int i = 0; i < this.nextOfScanners.length; i++) {
       this.nextOfScanners[i] = new ArrayList<Result>();
     }
+    this.reversed = reversed;
   }
 
   private boolean hasNext(int nbRows) throws IOException {
@@ -75,9 +77,9 @@ public class DistributedScanner implements ResultScanner {
     // Collect values to be returned here
     ArrayList<Result> resultSets = new ArrayList<Result>(nbRows);
     for(int i = 0; i < nbRows; i++) {
-      Result next = next();
-      if (next != null) {
-        resultSets.add(next);
+      Result lclNext = next();
+      if (lclNext != null) {
+        resultSets.add(lclNext);
       } else {
         break;
       }
@@ -92,15 +94,15 @@ public class DistributedScanner implements ResultScanner {
     }
   }
 
-  public static DistributedScanner create(HTableInterface hTable, Scan originalScan, AbstractRowKeyDistributor keyDistributor) throws IOException {
+  public static DistributedScanner create(Table table, Scan originalScan, AbstractRowKeyDistributor keyDistributor) throws IOException {
     Scan[] scans = keyDistributor.getDistributedScans(originalScan);
 
     ResultScanner[] rss = new ResultScanner[scans.length];
     for (int i = 0; i < scans.length; i++) {
-      rss[i] = hTable.getScanner(scans[i]);
+      rss[i] = table.getScanner(scans[i]);
     }
 
-    return new DistributedScanner(keyDistributor, rss);
+    return new DistributedScanner(keyDistributor, rss, originalScan.isReversed());
   }
 
   private Result nextInternal(int nbRows) throws IOException {
@@ -124,8 +126,11 @@ public class DistributedScanner implements ResultScanner {
       }
 
       // if result is null or next record has original key less than the candidate to be returned
-      if (result == null || Bytes.compareTo(keyDistributor.getOriginalKey(nextOfScanners[i].get(0).getRow()),
-                                            keyDistributor.getOriginalKey(result.getRow())) < 0) {
+      int compare = 0;
+      if (result != null) {
+        compare = Bytes.compareTo(keyDistributor.getOriginalKey(nextOfScanners[i].get(0).getRow()), keyDistributor.getOriginalKey(result.getRow()));
+      }
+      if (result == null || (!reversed && compare < 0) || (reversed && compare > 0)) {
         result = nextOfScanners[i].get(0);
         indexOfScannerToUse = i;
       }
@@ -143,17 +148,18 @@ public class DistributedScanner implements ResultScanner {
     // Identical to HTable.ClientScanner implementation
     return new Iterator<Result>() {
       // The next RowResult, possibly pre-read
-      Result next = null;
+      Result lclNext = null;
 
       // return true if there is another item pending, false if there isn't.
       // this method is where the actual advancing takes place, but you need
       // to call next() to consume it. hasNext() will only advance if there
       // isn't a pending next().
+      @Override
       public boolean hasNext() {
-        if (next == null) {
+        if (lclNext == null) {
           try {
-            next = DistributedScanner.this.next();
-            return next != null;
+            lclNext = DistributedScanner.this.next();
+            return lclNext != null;
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -163,6 +169,7 @@ public class DistributedScanner implements ResultScanner {
 
       // get the pending next item and advance the iterator. returns null if
       // there is no next item.
+      @Override
       public Result next() {
         // since hasNext() does the real advancing, we call this to determine
         // if there is a next before proceeding.
@@ -173,11 +180,12 @@ public class DistributedScanner implements ResultScanner {
         // if we get to here, then hasNext() has given us an item to return.
         // we want to return the item and then null out the next pointer, so
         // we use a temporary variable.
-        Result temp = next;
-        next = null;
+        Result temp = lclNext;
+        lclNext = null;
         return temp;
       }
 
+      @Override
       public void remove() {
         throw new UnsupportedOperationException();
       }
